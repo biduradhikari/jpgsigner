@@ -139,11 +139,26 @@
         touch-action: none !important;
       }
 
-      /* Prevent zoom on input focus */
+      /* Critical fixes for text input */
       input,
       textarea,
       [contenteditable="true"] {
-        font-size: 14px !important;
+        font-size: 16px !important;
+      }
+
+      /* Fix for Fabric's hidden textarea */
+      .upper-canvas ~ textarea {
+        font-size: 16px !important;
+        line-height: 1.4 !important;
+        padding: 4px 8px !important;
+        border-radius: 4px !important;
+        background: white !important;
+        border: 1px solid #ccc !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+        min-width: 150px !important;
+        width: auto !important;
+        white-space: nowrap !important;
+        overflow: visible !important;
       }
 
       @media (max-width: 768px) and (orientation: landscape) {
@@ -419,7 +434,7 @@
         });
 
       // =====================
-      // TEXT - Mobile optimized with toolbar
+      // TEXT - Fixed for mobile with proper input handling
       // =====================
       function addText() {
         const text = new fabric.IText("Tap to edit", {
@@ -427,15 +442,17 @@
           top: canvas.getHeight() / 2 - 20,
           originX: "left",
           originY: "top",
-          fontSize: 18,
+          fontSize: 24,
           fill: "#000000",
           fontFamily: "system-ui, -apple-system, sans-serif",
-          padding: 10,
-          backgroundColor: "rgba(255,255,255,0.7)",
+          padding: 8,
+          backgroundColor: "rgba(255,255,255,0.9)",
           stroke: "#000",
           strokeWidth: 0,
           hasControls: true,
           hasBorders: true,
+          width: 200, // Set initial width
+          editable: true,
         });
 
         canvas.add(text);
@@ -467,8 +484,9 @@
       }
 
       function setupTextEvents(text) {
-        // Prevent zoom when editing text
+        // Fix for text editing on mobile
         text.on("editing:entered", () => {
+          // Lock viewport to prevent zoom
           const metaViewport = document.querySelector('meta[name="viewport"]');
           if (metaViewport) {
             metaViewport.setAttribute(
@@ -477,28 +495,59 @@
             );
           }
 
+          // Fix the hidden textarea styling and behavior
           setTimeout(() => {
-            const textInput = canvas
-              .getElement()
-              .querySelector('input[type="text"]');
-            if (textInput) {
-              textInput.setAttribute("autocorrect", "off");
-              textInput.setAttribute("spellcheck", "false");
-              textInput.setAttribute("autocapitalize", "none");
-              textInput.style.fontSize = "16px";
-              textInput.style.transform = "scale(1)";
-              textInput.style.width = "auto";
-              textInput.style.minWidth = "200px";
+            const hiddenTextarea = document.querySelector(
+              ".upper-canvas ~ textarea",
+            );
+            if (hiddenTextarea) {
+              // Style the textarea properly
+              hiddenTextarea.style.fontSize = text.fontSize + "px";
+              hiddenTextarea.style.fontFamily = text.fontFamily;
+              hiddenTextarea.style.padding = "8px 12px";
+              hiddenTextarea.style.border = "2px solid #007bff";
+              hiddenTextarea.style.borderRadius = "8px";
+              hiddenTextarea.style.backgroundColor = "white";
+              hiddenTextarea.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
+              hiddenTextarea.style.minWidth = (text.width || 200) + "px";
+              hiddenTextarea.style.width = "auto";
+              hiddenTextarea.style.whiteSpace = "pre";
+              hiddenTextarea.style.overflow = "visible";
+              hiddenTextarea.style.position = "fixed";
+
+              // Remove any max-width restrictions
+              hiddenTextarea.style.maxWidth = "none";
+
+              // Ensure cursor appears correctly
+              hiddenTextarea.focus();
+
+              // Move cursor to end of text
+              const textLength = hiddenTextarea.value.length;
+              hiddenTextarea.setSelectionRange(textLength, textLength);
             }
-          }, 10);
+          }, 50);
         });
 
         text.on("editing:exited", () => {
+          // Update text object dimensions after editing
+          if (text.text) {
+            // Calculate new width based on text content
+            const tempCanvas = document.createElement("canvas");
+            const ctx = tempCanvas.getContext("2d");
+            ctx.font = `${text.fontSize}px ${text.fontFamily}`;
+            const textWidth = ctx.measureText(text.text).width;
+            text.set("width", textWidth + 20); // Add padding
+          }
           canvas.renderAll();
         });
 
         text.on("selected", () => {
           showTextToolbar(text);
+        });
+
+        // Fix for cursor position
+        text.on("changed", () => {
+          canvas.renderAll();
         });
       }
 
