@@ -1,0 +1,463 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Document Signer</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: #f5f5f5;
+      }
+
+      header {
+        padding: 16px;
+        font-size: 18px;
+        font-weight: bold;
+        background: #111;
+        color: white;
+        text-align: center;
+      }
+
+      #canvas-container {
+        padding: 10px;
+        text-align: center;
+      }
+
+      canvas {
+        border-radius: 10px;
+        max-width: 100%;
+        border: 1px solid #ccc;
+      }
+
+      #controls {
+        position: fixed;
+        bottom: 0;
+        width: 100%;
+        background: white;
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+        padding: 10px;
+      }
+
+      .btn {
+        width: 100%;
+        padding: 14px;
+        margin: 6px 0;
+        border: none;
+        border-radius: 10px;
+        font-size: 16px;
+        background: #007bff;
+        color: white;
+      }
+
+      .btn.secondary {
+        background: #6c757d;
+      }
+
+      .btn.success {
+        background: #28a745;
+      }
+
+      input[type="file"] {
+        display: none;
+      }
+
+      .step {
+        display: none;
+      }
+
+      .step.active {
+        display: block;
+      }
+
+      #threshold {
+        width: 100%;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- <header id="title">Step 1: Upload Document</header> -->
+
+    <div id="canvas-container">
+      <canvas id="canvas"></canvas>
+    </div>
+
+    <div id="controls">
+      <!-- STEP 1 -->
+      <div class="step active" id="step1">
+        <label class="btn">
+          Upload Document
+          <input type="file" id="uploadBase" />
+        </label>
+      </div>
+
+      <!-- STEP 2 -->
+      <div class="step" id="step2">
+        <label class="btn">
+          Add Signature
+          <input type="file" id="uploadOverlay" />
+        </label>
+        <button class="btn secondary" onclick="nextStep(3)">Skip</button>
+      </div>
+
+      <!-- STEP 3 -->
+      <div class="step" id="step3">
+        <label>Remove Background</label>
+        <input type="range" id="threshold" min="100" max="255" value="180" />
+        <button class="btn" onclick="nextStep(4)">Next</button>
+      </div>
+
+      <!-- STEP 4 -->
+      <div class="step" id="step4">
+        <button class="btn" onclick="startCrop()">Start Crop</button>
+        <button class="btn" hidden onclick="applyCrop()">Apply Crop</button>
+        <button class="btn secondary" id="skip" onclick="nextStep(5)">
+          Skip
+        </button>
+      </div>
+
+      <!-- STEP 5 -->
+      <div class="step" id="step5">
+        <button class="btn" onclick="addText()">Add Text</button>
+        <button class="btn" onclick="nextStep(6)">Done</button>
+      </div>
+
+      <!-- STEP 6 -->
+      <div class="step" id="step6">
+        <button class="btn success" onclick="exportImage()">Save JPEG</button>
+        <button class="btn" onclick="shareImage()">Share</button>
+      </div>
+    </div>
+
+    <script>
+      const canvas = new fabric.Canvas("canvas");
+
+      // =====================
+      // STEP CONTROL
+      // =====================
+      let currentStep = 1;
+
+      function nextStep(step) {
+        document
+          .getElementById(`step${currentStep}`)
+          .classList.remove("active");
+        currentStep = step;
+        document.getElementById(`step${currentStep}`).classList.add("active");
+
+        const titles = {
+          1: "Upload Document",
+          2: "Add Signature",
+          3: "Remove Background",
+          4: "Crop Signature",
+          5: "Add Text",
+          6: "Export / Share",
+        };
+
+        document.getElementById("title").innerText = titles[currentStep];
+      }
+
+      // =====================
+      // BASE IMAGE
+      // =====================
+      document
+        .getElementById("uploadBase")
+        .addEventListener("change", function (e) {
+          const file = e.target.files[0];
+          const reader = new FileReader();
+
+          reader.onload = function (f) {
+            fabric.Image.fromURL(f.target.result, function (img) {
+              canvas.setWidth(img.width);
+              canvas.setHeight(img.height);
+
+              canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
+                originX: "left",
+                originY: "top",
+                scaleX: 1,
+                scaleY: 1,
+              });
+
+              nextStep(2);
+            });
+          };
+
+          reader.readAsDataURL(file);
+        });
+
+      // =====================
+      // OVERLAY IMAGE
+      // =====================
+      document
+        .getElementById("uploadOverlay")
+        .addEventListener("change", function (e) {
+          const file = e.target.files[0];
+          const reader = new FileReader();
+
+          reader.onload = function (f) {
+            fabric.Image.fromURL(f.target.result, function (img) {
+              img.set({
+                left: 100,
+                top: 100,
+                scaleX: 0.5,
+                scaleY: 0.5,
+              });
+
+              canvas.add(img);
+              canvas.setActiveObject(img);
+
+              prepareImageForEditing(img);
+
+              nextStep(3);
+            });
+          };
+
+          reader.readAsDataURL(file);
+        });
+
+      // =====================
+      // TEXT
+      // =====================
+      function addText() {
+        const text = new fabric.IText("Edit me", {
+          left: canvas.getWidth() / 2,
+          top: canvas.getHeight() / 2,
+          originX: "left",
+          originY: "top",
+          fontSize: 32,
+          fill: "black",
+        });
+
+        canvas.add(text);
+        canvas.setActiveObject(text);
+
+        // Block auto-correct when editing starts
+        text.on("editing:entered", () => {
+          setTimeout(() => {
+            const textInput = canvas
+              .getElement()
+              .querySelector('input[type="text"]');
+            if (textInput) {
+              textInput.setAttribute("autocorrect", "off");
+              textInput.setAttribute("spellcheck", "false");
+              textInput.setAttribute("autocapitalize", "none");
+            }
+          }, 0);
+        });
+      }
+
+      // =====================
+      // EXPORT
+      // =====================
+      function exportImage() {
+        const dataURL = canvas.toDataURL({
+          format: "jpeg",
+          quality: 1,
+        });
+
+        const link = document.createElement("a");
+        link.href = dataURL;
+        link.download = "document.jpg";
+        link.click();
+      }
+
+      // =====================
+      // SHARE
+      // =====================
+      function shareImage() {
+        const dataURL = canvas.toDataURL({
+          format: "jpeg",
+          quality: 1,
+        });
+
+        fetch(dataURL)
+          .then((res) => res.blob())
+          .then((blob) => {
+            const file = new File([blob], "document.jpg", {
+              type: "image/jpeg",
+            });
+
+            if (navigator.share) {
+              navigator.share({
+                files: [file],
+                title: "Edited Document",
+              });
+            } else {
+              alert("Sharing not supported. Use Save instead.");
+            }
+          });
+      }
+
+      // =====================
+      // CROP
+      // =====================
+      let cropRect;
+      let activeImage;
+
+      function startCrop() {
+        document.querySelector("button[onclick='applyCrop()']").hidden = false;
+        document.querySelector("button[onclick='startCrop()']").hidden = true;
+        activeImage = canvas.getActiveObject();
+
+        if (!activeImage || activeImage.type !== "image") {
+          alert("Select the signature image first");
+          return;
+        }
+
+        cropRect = new fabric.Rect({
+          left:
+            activeImage.left +
+            (activeImage.width * activeImage.scaleX) / 2 -
+            100,
+          top:
+            activeImage.top +
+            (activeImage.height * activeImage.scaleY) / 2 -
+            50,
+          width: 200,
+          height: 100,
+          fill: "rgba(0,0,0,0.2)",
+          stroke: "red",
+          strokeWidth: 2,
+          originX: "left",
+          originY: "top",
+        });
+
+        canvas.add(cropRect);
+        canvas.setActiveObject(cropRect);
+      }
+      function applyCrop() {
+        if (!cropRect || !activeImage) return;
+
+        const crop = cropRect.getBoundingRect();
+
+        const imgMatrix = activeImage.calcTransformMatrix();
+        const inverted = fabric.util.invertTransform(imgMatrix);
+
+        const topLeft = fabric.util.transformPoint(
+          new fabric.Point(crop.left, crop.top),
+          inverted,
+        );
+
+        const bottomRight = fabric.util.transformPoint(
+          new fabric.Point(crop.left + crop.width, crop.top + crop.height),
+          inverted,
+        );
+
+        activeImage.clipPath = new fabric.Rect({
+          left: topLeft.x,
+          top: topLeft.y,
+          width: bottomRight.x - topLeft.x,
+          height: bottomRight.y - topLeft.y,
+        });
+
+        canvas.remove(cropRect);
+        cropRect = null;
+
+        canvas.setActiveObject(activeImage);
+        canvas.renderAll();
+
+        prepareImageForEditing(activeImage);
+
+        nextStep(5);
+      }
+
+      // =====================
+      // BG REMOVAL
+      // =====================
+      function smartRemoveBG(imgObj) {
+        const original = imgObj._originalData;
+        if (!original) return;
+
+        const tempCanvas = document.createElement("canvas");
+        const ctx = tempCanvas.getContext("2d");
+
+        tempCanvas.width = original.width;
+        tempCanvas.height = original.height;
+
+        const data = new ImageData(
+          new Uint8ClampedArray(original.data),
+          original.width,
+          original.height,
+        );
+
+        const d = data.data;
+
+        // Auto detect background (assumes light bg)
+        let avg = 0;
+        for (let i = 0; i < d.length; i += 4) {
+          avg += (d[i] + d[i + 1] + d[i + 2]) / 3;
+        }
+        avg /= d.length / 4;
+
+        const threshold = avg + 10;
+
+        for (let i = 0; i < d.length; i += 4) {
+          const brightness = (d[i] + d[i + 1] + d[i + 2]) / 3;
+          if (brightness > threshold) d[i + 3] = 0;
+        }
+
+        ctx.putImageData(data, 0, 0);
+
+        imgObj.setSrc(tempCanvas.toDataURL(), () => {
+          canvas.renderAll();
+        });
+      }
+      function prepareImageForEditing(imgObj) {
+        const imgEl = imgObj._element;
+
+        const tempCanvas = document.createElement("canvas");
+        const ctx = tempCanvas.getContext("2d");
+
+        tempCanvas.width = imgEl.naturalWidth;
+        tempCanvas.height = imgEl.naturalHeight;
+
+        ctx.drawImage(imgEl, 0, 0);
+
+        imgObj._originalData = ctx.getImageData(
+          0,
+          0,
+          tempCanvas.width,
+          tempCanvas.height,
+        );
+      }
+
+      document
+        .getElementById("threshold")
+        .addEventListener("input", function () {
+          const obj = canvas.getActiveObject();
+          if (!obj || obj.type !== "image" || !obj._originalData) return;
+
+          const threshold = parseInt(this.value);
+          const original = obj._originalData;
+
+          const tempCanvas = document.createElement("canvas");
+          const ctx = tempCanvas.getContext("2d");
+
+          tempCanvas.width = original.width;
+          tempCanvas.height = original.height;
+
+          const data = new ImageData(
+            new Uint8ClampedArray(original.data),
+            original.width,
+            original.height,
+          );
+
+          const d = data.data;
+
+          for (let i = 0; i < d.length; i += 4) {
+            const brightness = (d[i] + d[i + 1] + d[i + 2]) / 3;
+            if (brightness > threshold) d[i + 3] = 0;
+          }
+
+          ctx.putImageData(data, 0, 0);
+
+          obj.setSrc(tempCanvas.toDataURL(), () => {
+            canvas.renderAll();
+          });
+        });
+    </script>
+  </body>
+</html>
