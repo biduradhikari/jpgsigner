@@ -2,55 +2,90 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <title>Document Signer</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>Document Signer - Mobile Optimized</title>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
 
     <style>
+      * {
+        -webkit-tap-highlight-color: transparent;
+      }
+
       body {
         margin: 0;
-        font-family: system-ui, sans-serif;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
         background: #f5f5f5;
+        touch-action: pan-x pan-y;
       }
 
       header {
         padding: 16px;
-        font-size: 18px;
+        font-size: 20px;
         font-weight: bold;
         background: #111;
         color: white;
         text-align: center;
+        position: sticky;
+        top: 0;
+        z-index: 10;
       }
 
       #canvas-container {
         padding: 10px;
         text-align: center;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        min-height: 300px;
       }
 
       canvas {
         border-radius: 10px;
         max-width: 100%;
+        height: auto;
         border: 1px solid #ccc;
+        touch-action: none;
       }
 
       #controls {
         position: fixed;
         bottom: 0;
-        width: 100%;
+        left: 0;
+        right: 0;
         background: white;
-        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-        padding: 10px;
+        box-shadow: 0 -2px 15px rgba(0, 0, 0, 0.15);
+        padding: 16px;
+        z-index: 100;
+        border-radius: 20px 20px 0 0;
+        max-height: 40vh;
+        overflow-y: auto;
       }
 
       .btn {
         width: 100%;
-        padding: 14px;
-        margin: 6px 0;
+        padding: 16px;
+        margin: 8px 0;
         border: none;
-        border-radius: 10px;
-        font-size: 25px;
+        border-radius: 12px;
+        font-size: 17px;
+        font-weight: 600;
         background: #007bff;
         color: white;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        touch-action: manipulation;
+        min-height: 52px;
+      }
+
+      .btn:active {
+        transform: scale(0.98);
+        opacity: 0.9;
       }
 
       .btn.secondary {
@@ -59,6 +94,22 @@
 
       .btn.success {
         background: #28a745;
+      }
+
+      .btn.warning {
+        background: #ffc107;
+        color: #000;
+      }
+
+      .button-group {
+        display: flex;
+        gap: 12px;
+        margin: 8px 0;
+      }
+
+      .button-group .btn {
+        flex: 1;
+        margin: 0;
       }
 
       input[type="file"] {
@@ -75,12 +126,79 @@
 
       #threshold {
         width: 100%;
+        margin: 12px 0;
+        height: 44px;
+      }
+
+      label {
+        display: block;
+      }
+
+      /* Fix for Fabric.js text editing on mobile */
+      .canvas-container {
+        touch-action: none !important;
+      }
+
+      /* Prevent zoom on input focus */
+      input,
+      textarea,
+      [contenteditable="true"] {
+        font-size: 14px !important;
+      }
+
+      @media (max-width: 768px) and (orientation: landscape) {
+        #controls {
+          padding: 8px 16px;
+          max-height: 50vh;
+        }
+
+        .btn {
+          padding: 12px;
+          margin: 4px 0;
+          min-height: 44px;
+          font-size: 15px;
+        }
+
+        .button-group {
+          gap: 8px;
+        }
+      }
+
+      /* Text editing toolbar */
+      .text-toolbar {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: white;
+        border-radius: 30px;
+        padding: 8px 16px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        display: none;
+        gap: 12px;
+        z-index: 200;
+        backdrop-filter: blur(10px);
+      }
+
+      .text-toolbar button {
+        background: #007bff;
+        border: none;
+        border-radius: 20px;
+        padding: 8px 16px;
+        color: white;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .text-toolbar button:active {
+        transform: scale(0.95);
       }
     </style>
   </head>
 
   <body>
-    <!-- <header id="title">Step 1: Upload Document</header> -->
+    <header id="title">📄 Step 1: Upload Document</header>
 
     <div id="canvas-container">
       <canvas id="canvas"></canvas>
@@ -90,51 +208,105 @@
       <!-- STEP 1 -->
       <div class="step active" id="step1">
         <label class="btn">
-          Upload Document
-          <input type="file" id="uploadBase" />
+          📄 Upload Document
+          <input type="file" id="uploadBase" accept="image/*" />
         </label>
       </div>
 
       <!-- STEP 2 -->
       <div class="step" id="step2">
         <label class="btn">
-          Add Signature
-          <input type="file" id="uploadOverlay" />
+          ✍️ Add Signature
+          <input type="file" id="uploadOverlay" accept="image/*" />
         </label>
-        <button class="btn secondary" onclick="nextStep(3)">Skip</button>
+        <button class="btn secondary" onclick="nextStep(3)">⏭️ Skip</button>
       </div>
 
       <!-- STEP 3 -->
       <div class="step" id="step3">
-        <label>Remove Background</label>
+        <label style="margin-bottom: 8px; display: block"
+          >🎨 Remove Background</label
+        >
         <input type="range" id="threshold" min="100" max="255" value="180" />
-        <button class="btn" onclick="nextStep(4)">Next</button>
+        <button class="btn" onclick="nextStep(4)">➡️ Next</button>
       </div>
 
       <!-- STEP 4 -->
       <div class="step" id="step4">
-        <button class="btn" onclick="startCrop()">Start Crop</button>
-        <button class="btn" hidden onclick="applyCrop()">Apply Crop</button>
-        <button class="btn secondary" id="skip" onclick="nextStep(5)">
-          Skip
+        <div class="button-group">
+          <button class="btn" onclick="startCrop()">✂️ Crop Signature</button>
+          <button class="btn secondary" onclick="nextStep(5)">⏭️ Skip</button>
+        </div>
+        <button
+          class="btn success"
+          hidden
+          id="applyCropBtn"
+          onclick="applyCrop()"
+        >
+          ✅ Apply Crop
         </button>
       </div>
 
       <!-- STEP 5 -->
       <div class="step" id="step5">
-        <button class="btn" onclick="addText()">Add Text</button>
-        <button class="btn" onclick="nextStep(6)">Done</button>
+        <div class="button-group">
+          <button class="btn warning" onclick="addText()">📝 Add Text</button>
+          <button class="btn success" onclick="nextStep(6)">✅ Done</button>
+        </div>
+        <button
+          class="btn secondary"
+          onclick="addMultipleTexts()"
+          style="margin-top: 8px"
+        >
+          ➕ Add Another Text
+        </button>
       </div>
 
       <!-- STEP 6 -->
       <div class="step" id="step6">
-        <button class="btn success" onclick="exportImage()">Save JPEG</button>
-        <button class="btn" onclick="shareImage()">Share</button>
+        <div class="button-group">
+          <button class="btn success" onclick="exportImage()">
+            💾 Save JPEG
+          </button>
+          <button class="btn" onclick="shareImage()">📤 Share</button>
+        </div>
+        <button
+          class="btn secondary"
+          onclick="nextStep(5)"
+          style="margin-top: 8px"
+        >
+          ✏️ Continue Editing
+        </button>
       </div>
     </div>
 
+    <div class="text-toolbar" id="textToolbar">
+      <button onclick="changeTextColor()">🎨 Color</button>
+      <button onclick="increaseFontSize()">🔍 Larger</button>
+      <button onclick="decreaseFontSize()">🔍 Smaller</button>
+      <button onclick="deleteSelectedText()">🗑️ Delete</button>
+    </div>
+
     <script>
-      const canvas = new fabric.Canvas("canvas");
+      // Prevent zoom on double-tap
+      document.addEventListener(
+        "touchstart",
+        (e) => {
+          if (e.touches.length > 1) {
+            e.preventDefault();
+          }
+        },
+        { passive: false },
+      );
+
+      const canvas = new fabric.Canvas("canvas", {
+        enableRetinaScaling: true,
+        selection: true,
+        allowTouchScrolling: false,
+      });
+
+      // Track current text object for toolbar
+      let currentTextObject = null;
 
       // =====================
       // STEP CONTROL
@@ -149,15 +321,20 @@
         document.getElementById(`step${currentStep}`).classList.add("active");
 
         const titles = {
-          1: "Upload Document",
-          2: "Add Signature",
-          3: "Remove Background",
-          4: "Crop Signature",
-          5: "Add Text",
-          6: "Export / Share",
+          1: "📄 Upload Document",
+          2: "✍️ Add Signature",
+          3: "🎨 Remove Background",
+          4: "✂️ Crop Signature",
+          5: "📝 Add Text",
+          6: "💾 Export / Share",
         };
 
         document.getElementById("title").innerText = titles[currentStep];
+
+        // Hide text toolbar when changing steps
+        document.getElementById("textToolbar").style.display = "none";
+
+        window.scrollTo({ top: 0, behavior: "smooth" });
       }
 
       // =====================
@@ -167,18 +344,34 @@
         .getElementById("uploadBase")
         .addEventListener("change", function (e) {
           const file = e.target.files[0];
+          if (!file) return;
+
           const reader = new FileReader();
 
           reader.onload = function (f) {
             fabric.Image.fromURL(f.target.result, function (img) {
-              canvas.setWidth(img.width);
-              canvas.setHeight(img.height);
+              const maxWidth = window.innerWidth - 40;
+              const maxHeight = window.innerHeight - 250;
+
+              let scale = 1;
+              if (img.width > maxWidth) {
+                scale = maxWidth / img.width;
+              }
+              if (img.height * scale > maxHeight) {
+                scale = maxHeight / img.height;
+              }
+
+              const displayWidth = img.width * scale;
+              const displayHeight = img.height * scale;
+
+              canvas.setWidth(displayWidth);
+              canvas.setHeight(displayHeight);
+
+              img.scale(scale);
 
               canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
                 originX: "left",
                 originY: "top",
-                scaleX: 1,
-                scaleY: 1,
               });
 
               nextStep(2);
@@ -195,15 +388,22 @@
         .getElementById("uploadOverlay")
         .addEventListener("change", function (e) {
           const file = e.target.files[0];
+          if (!file) return;
+
           const reader = new FileReader();
 
           reader.onload = function (f) {
             fabric.Image.fromURL(f.target.result, function (img) {
+              const maxSigWidth = canvas.getWidth() * 0.4;
+              let scale = maxSigWidth / img.width;
+              if (scale > 0.8) scale = 0.8;
+              if (scale < 0.2) scale = 0.2;
+
               img.set({
-                left: 100,
-                top: 100,
-                scaleX: 0.5,
-                scaleY: 0.5,
+                left: canvas.getWidth() / 2 - (img.width * scale) / 2,
+                top: canvas.getHeight() / 2 - (img.height * scale) / 2,
+                scaleX: scale,
+                scaleY: scale,
               });
 
               canvas.add(img);
@@ -219,23 +419,64 @@
         });
 
       // =====================
-      // TEXT
+      // TEXT - Mobile optimized with toolbar
       // =====================
       function addText() {
-        const text = new fabric.IText("Edit me", {
-          left: canvas.getWidth() / 2,
-          top: canvas.getHeight() / 2,
+        const text = new fabric.IText("Tap to edit", {
+          left: canvas.getWidth() / 2 - 60,
+          top: canvas.getHeight() / 2 - 20,
           originX: "left",
           originY: "top",
-          fontSize: 32,
-          fill: "black",
+          fontSize: 18,
+          fill: "#000000",
+          fontFamily: "system-ui, -apple-system, sans-serif",
+          padding: 10,
+          backgroundColor: "rgba(255,255,255,0.7)",
+          stroke: "#000",
+          strokeWidth: 0,
+          hasControls: true,
+          hasBorders: true,
         });
 
         canvas.add(text);
         canvas.setActiveObject(text);
+        canvas.renderAll();
 
-        // Block auto-correct when editing starts
+        setupTextEvents(text);
+
+        // Show toolbar when text is selected
+        canvas.on("selection:created", (e) => {
+          if (e.selected && e.selected[0] && e.selected[0].isType("i-text")) {
+            showTextToolbar(e.selected[0]);
+          }
+        });
+
+        canvas.on("selection:updated", (e) => {
+          if (e.selected && e.selected[0] && e.selected[0].isType("i-text")) {
+            showTextToolbar(e.selected[0]);
+          }
+        });
+
+        canvas.on("selection:cleared", () => {
+          document.getElementById("textToolbar").style.display = "none";
+        });
+      }
+
+      function addMultipleTexts() {
+        addText();
+      }
+
+      function setupTextEvents(text) {
+        // Prevent zoom when editing text
         text.on("editing:entered", () => {
+          const metaViewport = document.querySelector('meta[name="viewport"]');
+          if (metaViewport) {
+            metaViewport.setAttribute(
+              "content",
+              "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no",
+            );
+          }
+
           setTimeout(() => {
             const textInput = canvas
               .getElement()
@@ -244,9 +485,82 @@
               textInput.setAttribute("autocorrect", "off");
               textInput.setAttribute("spellcheck", "false");
               textInput.setAttribute("autocapitalize", "none");
+              textInput.style.fontSize = "16px";
+              textInput.style.transform = "scale(1)";
+              textInput.style.width = "auto";
+              textInput.style.minWidth = "200px";
             }
-          }, 0);
+          }, 10);
         });
+
+        text.on("editing:exited", () => {
+          canvas.renderAll();
+        });
+
+        text.on("selected", () => {
+          showTextToolbar(text);
+        });
+      }
+
+      function showTextToolbar(textObj) {
+        currentTextObject = textObj;
+        const toolbar = document.getElementById("textToolbar");
+        toolbar.style.display = "flex";
+
+        // Hide toolbar after 3 seconds of inactivity
+        clearTimeout(window.toolbarTimeout);
+        window.toolbarTimeout = setTimeout(() => {
+          if (!canvas.getActiveObject()) {
+            toolbar.style.display = "none";
+          }
+        }, 3000);
+      }
+
+      function changeTextColor() {
+        if (!currentTextObject) return;
+        const colors = [
+          "#000000",
+          "#FF0000",
+          "#0000FF",
+          "#00FF00",
+          "#FF9900",
+          "#9900FF",
+        ];
+        const currentColor = currentTextObject.fill;
+        let nextColor = colors[0];
+        for (let i = 0; i < colors.length; i++) {
+          if (colors[i] === currentColor) {
+            nextColor = colors[(i + 1) % colors.length];
+            break;
+          }
+        }
+        currentTextObject.set("fill", nextColor);
+        canvas.renderAll();
+      }
+
+      function increaseFontSize() {
+        if (!currentTextObject) return;
+        let newSize = currentTextObject.fontSize + 4;
+        if (newSize > 72) newSize = 72;
+        currentTextObject.set("fontSize", newSize);
+        canvas.renderAll();
+      }
+
+      function decreaseFontSize() {
+        if (!currentTextObject) return;
+        let newSize = currentTextObject.fontSize - 4;
+        if (newSize < 12) newSize = 12;
+        currentTextObject.set("fontSize", newSize);
+        canvas.renderAll();
+      }
+
+      function deleteSelectedText() {
+        if (!currentTextObject) return;
+        canvas.remove(currentTextObject);
+        currentTextObject = null;
+        document.getElementById("textToolbar").style.display = "none";
+        canvas.discardActiveObject();
+        canvas.renderAll();
       }
 
       // =====================
@@ -255,12 +569,12 @@
       function exportImage() {
         const dataURL = canvas.toDataURL({
           format: "jpeg",
-          quality: 1,
+          quality: 0.95,
         });
 
         const link = document.createElement("a");
         link.href = dataURL;
-        link.download = "document.jpg";
+        link.download = "signed_document.jpg";
         link.click();
       }
 
@@ -270,21 +584,28 @@
       function shareImage() {
         const dataURL = canvas.toDataURL({
           format: "jpeg",
-          quality: 1,
+          quality: 0.95,
         });
 
         fetch(dataURL)
           .then((res) => res.blob())
           .then((blob) => {
-            const file = new File([blob], "document.jpg", {
+            const file = new File([blob], "signed_document.jpg", {
               type: "image/jpeg",
             });
 
             if (navigator.share) {
-              navigator.share({
-                files: [file],
-                title: "Edited Document",
-              });
+              navigator
+                .share({
+                  files: [file],
+                  title: "Signed Document",
+                  text: "Here's my signed document",
+                })
+                .catch((err) => {
+                  if (err.name !== "AbortError") {
+                    alert("Share cancelled. Use Save instead.");
+                  }
+                });
             } else {
               alert("Sharing not supported. Use Save instead.");
             }
@@ -298,13 +619,18 @@
       let activeImage;
 
       function startCrop() {
-        document.querySelector("button[onclick='applyCrop()']").hidden = false;
-        document.querySelector("button[onclick='startCrop()']").hidden = true;
+        const applyBtn = document.getElementById("applyCropBtn");
+        applyBtn.hidden = false;
+
         activeImage = canvas.getActiveObject();
 
         if (!activeImage || activeImage.type !== "image") {
-          alert("Select the signature image first");
+          alert("Please select the signature image first by tapping on it");
           return;
+        }
+
+        if (cropRect) {
+          canvas.remove(cropRect);
         }
 
         cropRect = new fabric.Rect({
@@ -318,16 +644,21 @@
             50,
           width: 200,
           height: 100,
-          fill: "rgba(0,0,0,0.2)",
-          stroke: "red",
-          strokeWidth: 2,
+          fill: "rgba(0,255,0,0.2)",
+          stroke: "#00ff00",
+          strokeWidth: 3,
           originX: "left",
           originY: "top",
+          hasControls: true,
+          hasBorders: true,
+          lockRotation: true,
         });
 
         canvas.add(cropRect);
         canvas.setActiveObject(cropRect);
+        canvas.renderAll();
       }
+
       function applyCrop() {
         if (!cropRect || !activeImage) return;
 
@@ -361,51 +692,17 @@
 
         prepareImageForEditing(activeImage);
 
+        document.getElementById("applyCropBtn").hidden = true;
+
         nextStep(5);
       }
 
       // =====================
       // BG REMOVAL
       // =====================
-      function smartRemoveBG(imgObj) {
-        const original = imgObj._originalData;
-        if (!original) return;
-
-        const tempCanvas = document.createElement("canvas");
-        const ctx = tempCanvas.getContext("2d");
-
-        tempCanvas.width = original.width;
-        tempCanvas.height = original.height;
-
-        const data = new ImageData(
-          new Uint8ClampedArray(original.data),
-          original.width,
-          original.height,
-        );
-
-        const d = data.data;
-
-        // Auto detect background (assumes light bg)
-        let avg = 0;
-        for (let i = 0; i < d.length; i += 4) {
-          avg += (d[i] + d[i + 1] + d[i + 2]) / 3;
-        }
-        avg /= d.length / 4;
-
-        const threshold = avg + 10;
-
-        for (let i = 0; i < d.length; i += 4) {
-          const brightness = (d[i] + d[i + 1] + d[i + 2]) / 3;
-          if (brightness > threshold) d[i + 3] = 0;
-        }
-
-        ctx.putImageData(data, 0, 0);
-
-        imgObj.setSrc(tempCanvas.toDataURL(), () => {
-          canvas.renderAll();
-        });
-      }
       function prepareImageForEditing(imgObj) {
+        if (!imgObj._element) return;
+
         const imgEl = imgObj._element;
 
         const tempCanvas = document.createElement("canvas");
@@ -458,6 +755,16 @@
             canvas.renderAll();
           });
         });
+
+      // Fix for iOS zoom issues
+      document.addEventListener("gesturestart", function (e) {
+        e.preventDefault();
+      });
+
+      // Initialize canvas
+      canvas.setWidth(window.innerWidth - 40);
+      canvas.setHeight(400);
+      canvas.renderAll();
     </script>
   </body>
 </html>
